@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f7a3f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Softball Tracker</title>
+<style>
+:root{--bg:#f3f5f2;--card:#fff;--ink:#16211a;--muted:#6b766e;--line:#dde3dc;--accent:#1f7a3f;--out:#b42318;--hr:#b7791f;--run:#1d4ed8;--hl:#e8f4ec}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1511;--card:#18211b;--ink:#e8efe9;--muted:#93a097;--line:#2a352d;--accent:#2f9e57;--out:#e5484d;--hr:#d9962c;--run:#4f7fe8;--hl:#1e3326}}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);-webkit-tap-highlight-color:transparent}
+main{max-width:640px;margin:0 auto;padding:16px 16px 56px}
+header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+h1{font-size:20px;margin:0}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:20px 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.muted{color:var(--muted);font-size:14px}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:10px 12px;cursor:pointer;min-height:52px;font-weight:600}
+button:active{transform:scale(.97)}
+button:disabled{opacity:.35;cursor:default;transform:none}
+.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.out{background:var(--out);border-color:var(--out);color:#fff}
+.hr{background:var(--hr);border-color:var(--hr);color:#fff}
+.run{background:var(--run);border-color:var(--run);color:#fff}
+.sm{min-height:38px;padding:6px 10px;font-size:14px}
+.tools{display:flex;gap:6px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
+input,select{font:inherit;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
+label{display:block;font-size:14px;color:var(--muted);margin:10px 0 4px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.lineup-in{display:grid;grid-template-columns:28px 1fr;gap:8px;align-items:center;margin-top:6px}
+.lineup-in span{color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+/* scoreboard */
+.board{display:flex;gap:14px;align-items:stretch}
+.teams{flex:1;display:flex;flex-direction:column;gap:6px}
+.trow{display:flex;justify-content:space-between;align-items:center;font-size:20px;font-weight:600}
+.trow .score{font-size:30px;font-variant-numeric:tabular-nums}
+.trow .nm{display:flex;align-items:center;gap:8px;min-width:0}
+.trow .nm b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.dot{width:10px;height:10px;border-radius:50%;flex:none;background:transparent}
+.batting .dot{background:var(--accent)}
+.state{border-left:1px solid var(--line);padding-left:14px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px;min-width:72px}
+.inn{font-size:22px;font-weight:700}
+.outs{display:flex;gap:6px}
+.outs i{width:14px;height:14px;border-radius:50%;border:2px solid var(--out)}
+.outs i.on{background:var(--out)}
+.batter{font-size:26px;font-weight:700;margin:2px 0}
+/* line score */
+.ls-wrap{overflow-x:auto}
+table.ls{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:14px}
+.ls th,.ls td{padding:6px 4px;text-align:center;border-bottom:1px solid var(--line)}
+.ls th{color:var(--muted);font-weight:500}
+.ls th.cur{color:var(--accent);font-weight:700}
+.ls td.tn{text-align:left;max-width:90px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ls .tot{font-weight:700}
+/* lineup */
+.plist{list-style:none;margin:0;padding:0}
+.plist li{display:flex;align-items:center;gap:10px;padding:8px 6px;border-bottom:1px solid var(--line);border-radius:8px}
+.plist li:last-child{border-bottom:0}
+.plist li.up{background:var(--hl)}
+.plist .num{width:22px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.plist .pn{flex:1;min-width:0;background:none;border:0;padding:0;min-height:0;text-align:left;font-weight:600}
+.plist .pn small{display:block;font-weight:400;color:var(--muted);font-size:13px}
+.totals{display:flex;gap:16px;justify-content:flex-end;padding:8px 6px 0;color:var(--muted);font-size:14px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<div class="toast" id="toast"></div>
+<script>
+const KEY = 'softball-tracker-v1';
+const MAX_PLAYERS = 12;
+let S = load() || { screen: 'setup', teams: ['Away', 'Home'], our: 0, lineup: [], game: null };
+let history = [];
+
+function load() { try { return JSON.parse(localStorage.getItem(KEY)); } catch (e) { return null; } }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+function snap() { history.push(JSON.stringify(S)); if (history.length > 200) history.shift(); }
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const range = n => Array.from({ length: n }, (_, i) => i);
+const total = t => S.game.runs[t].reduce((a, b) => a + (b || 0), 0);
+
+function newGame() {
+  S.game = { inning: 1, half: 0, outs: 0, batter: 0, runs: [[], []], oppHr: 0 };
+  S.lineup.forEach(p => Object.assign(p, { pa: 0, r: 0, hr: 0, o: 0 }));
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ---------- game actions ----------
+function addRun(team) {
+  const g = S.game, i = g.inning - 1;
+  g.runs[team][i] = (g.runs[team][i] || 0) + 1;
+}
+function nextBatter() { S.game.batter = (S.game.batter + 1) % S.lineup.length; }
+function addOut() {
+  S.game.outs++;
+  if (S.game.outs >= 3) endHalf(true);
+}
+function endHalf(auto) {
+  const g = S.game;
+  // make sure the finished half shows a 0 rather than blank
+  const i = g.inning - 1; g.runs[g.half][i] = g.runs[g.half][i] || 0;
+  g.outs = 0;
+  if (g.half === 0) g.half = 1; else { g.half = 0; g.inning++; }
+  toast(`${auto ? '3 outs — ' : ''}${S.teams[g.half]} up, ${g.half ? 'bottom' : 'top'} ${g.inning}`);
+}
+
+const actions = {
+  // our batter
+  bOut() { const p = S.lineup[S.game.batter]; p.pa++; p.o++; nextBatter(); addOut(); },
+  bSafe() { const p = S.lineup[S.game.batter]; p.pa++; nextBatter(); },
+  bHR() { const p = S.lineup[S.game.batter]; p.pa++; p.hr++; p.r++; addRun(S.our); nextBatter(); toast(`💥 HR — ${p.name}`); },
+  pRun(i) { S.lineup[i].r++; addRun(S.our); },
+  runnerOut() { addOut(); },
+  // opponent
+  oOut() { addOut(); },
+  oRun() { addRun(1 - S.our); },
+  oHR() { S.game.oppHr++; addRun(1 - S.our); },
+  endHalf() { endHalf(false); },
+};
+
+// ---------- views ----------
+function setupView() {
+  const names = range(MAX_PLAYERS).map(i => S.lineup[i] ? S.lineup[i].name : '');
+  return `
+  <header><h1>Game setup</h1></header>
+  <div class="card">
+    <div class="row2">
+      <div><label for="t0">Away team</label><input id="t0" value="${esc(S.teams[0])}"></div>
+      <div><label for="t1">Home team</label><input id="t1" value="${esc(S.teams[1])}"></div>
+    </div>
+    <label for="our">Lineup is for</label>
+    <select id="our">
+      <option value="0" ${S.our === 0 ? 'selected' : ''}>Away team</option>
+      <option value="1" ${S.our === 1 ? 'selected' : ''}>Home team</option>
+    </select>
+  </div>
+  <h2>Batting order (up to ${MAX_PLAYERS})</h2>
+  <div class="card">
+    ${names.map((n, i) => `<div class="lineup-in"><span>${i + 1}</span><input class="pname" placeholder="Player ${i + 1}" value="${esc(n)}" autocomplete="off"></div>`).join('')}
+    <p class="muted">Blank rows are skipped. Stats follow a player by name if you edit mid-game.</p>
+  </div>
+  <div class="grid2">
+    ${S.game ? `<button data-act="cancelSetup">Cancel</button>` : '<span></span>'}
+    <button class="primary" data-act="saveSetup">${S.game ? 'Save & back to game' : 'Start game'}</button>
+  </div>`;
+}
+
+function gameView() {
+  const g = S.game, us = S.our, them = 1 - us, ours = g.half === us, n = S.lineup.length;
+  const cols = Math.max(7, g.inning);
+  const started = (t, i) => i + 1 < g.inning || (i + 1 === g.inning && t <= g.half);
+
+  const board = `
+  <div class="card board">
+    <div class="teams">
+      ${[0, 1].map(t => `<div class="trow ${g.half === t ? 'batting' : ''}"><span class="nm"><span class="dot"></span><b>${esc(S.teams[t])}</b></span><span class="score">${total(t)}</span></div>`).join('')}
+    </div>
+    <div class="state">
+      <div class="inn">${g.half ? '▼' : '▲'} ${g.inning}</div>
+      <div class="outs" aria-label="${g.outs} outs">${range(3).map(i => `<i class="${i < g.outs ? 'on' : ''}"></i>`).join('')}</div>
+    </div>
+  </div>`;
+
+  let panel;
+  if (ours) {
+    const b = S.lineup[g.batter], nx = S.lineup[(g.batter + 1) % n];
+    panel = `
+    <div class="card">
+      <div class="muted">Now batting · #${g.batter + 1}</div>
+      <div class="batter">${esc(b.name)}</div>
+      <div class="muted">On deck: ${esc(nx.name)}</div>
+      <div class="grid3">
+        <button class="out" data-act="bOut">Out</button>
+        <button class="primary" data-act="bSafe">On base</button>
+        <button class="hr" data-act="bHR">Home run</button>
+      </div>
+      <div class="grid2">
+        <button data-act="runnerOut">Runner out</button>
+        <button data-act="endHalf">End half-inning</button>
+      </div>
+      <p class="muted" style="margin:10px 0 0">Tap <b>+Run</b> beside a player when they cross home. HR scores the batter automatically.</p>
+    </div>`;
+  } else {
+    panel = `
+    <div class="card">
+      <div class="muted">Batting</div>
+      <div class="batter">${esc(S.teams[them])}</div>
+      <div class="muted">HR this game: ${g.oppHr}</div>
+      <div class="grid3">
+        <button class="out" data-act="oOut">Out</button>
+        <button class="run" data-act="oRun">+Run</button>
+        <button class="hr" data-act="oHR">Home run</button>
+      </div>
+      <div class="grid2" style="grid-template-columns:1fr">
+        <button data-act="endHalf">End half-inning</button>
+      </div>
+    </div>`;
+  }
+
+  const lineScore = `
+  <h2>Line score</h2>
+  <div class="card ls-wrap"><table class="ls">
+    <tr><th></th>${range(cols).map(i => `<th class="${i + 1 === g.inning ? 'cur' : ''}">${i + 1}</th>`).join('')}<th>R</th><th>HR</th></tr>
+    ${[0, 1].map(t => `<tr><td class="tn">${esc(S.teams[t])}</td>${range(cols).map(i => `<td>${g.runs[t][i] ?? (started(t, i) ? 0 : '')}</td>`).join('')}<td class="tot">${total(t)}</td><td>${t === us ? S.lineup.reduce((a, p) => a + p.hr, 0) : g.oppHr}</td></tr>`).join('')}
+  </table></div>`;
+
+  const sum = k => S.lineup.reduce((a, p) => a + p[k], 0);
+  const lineup = `
+  <h2>${esc(S.teams[us])} lineup</h2>
+  <div class="card">
+    <ul class="plist">
+      ${S.lineup.map((p, i) => `
+      <li class="${ours && i === g.batter ? 'up' : ''}">
+        <span class="num">${i + 1}</span>
+        <button class="pn" data-act="setBatter" data-i="${i}" title="Set as current batter">${esc(p.name)}
+          <small>R ${p.r} · HR ${p.hr} · Outs ${p.o} · PA ${p.pa}</small></button>
+        <button class="run sm" data-act="pRun" data-i="${i}" ${ours ? '' : 'disabled'}>+Run</button>
+      </li>`).join('')}
+    </ul>
+    <div class="totals"><span>R ${sum('r')}</span><span>HR ${sum('hr')}</span><span>Outs ${sum('o')}</span></div>
+    <p class="muted" style="margin:8px 0 0">Tap a name to make them the current batter.</p>
+  </div>`;
+
+  return `
+  <header>
+    <h1>Softball</h1>
+    <div class="tools">
+      <button class="sm" data-act="undo" ${history.length ? '' : 'disabled'}>Undo</button>
+      <button class="sm" data-act="editLineup">Lineup</button>
+      <button class="sm" data-act="newGame">New game</button>
+    </div>
+  </header>
+  ${board}
+  <div style="height:10px"></div>
+  ${panel}
+  ${lineScore}
+  ${lineup}`;
+}
+
+function render() {
+  document.getElementById('app').innerHTML = S.screen === 'setup' || !S.game ? setupView() : gameView();
+  save();
+}
+
+// ---------- events ----------
+document.addEventListener('click', e => {
+  const btn = e.target.closest('[data-act]');
+  if (!btn || btn.disabled) return;
+  const act = btn.dataset.act, i = +btn.dataset.i;
+
+  if (act === 'saveSetup') {
+    const names = [...document.querySelectorAll('.pname')].map(x => x.value.trim()).filter(Boolean);
+    if (!names.length) { alert('Add at least one player.'); return; }
+    if (S.game) snap();
+    const old = Object.fromEntries(S.lineup.map(p => [p.name, p]));
+    S.teams = [document.getElementById('t0').value.trim() || 'Away', document.getElementById('t1').value.trim() || 'Home'];
+    S.our = +document.getElementById('our').value;
+    S.lineup = names.map(n => old[n] || { name: n, pa: 0, r: 0, hr: 0, o: 0 });
+    if (!S.game) newGame(); else S.game.batter = Math.min(S.game.batter, S.lineup.length - 1);
+    S.screen = 'game';
+  } else if (act === 'cancelSetup') {
+    S.screen = 'game';
+  } else if (act === 'editLineup') {
+    S.screen = 'setup';
+  } else if (act === 'newGame') {
+    if (!confirm('Start a new game? Scores and stats reset; the lineup is kept.')) return;
+    snap(); newGame();
+  } else if (act === 'undo') {
+    const prev = history.pop(); if (prev) S = JSON.parse(prev);
+  } else if (act === 'setBatter') {
+    snap(); S.game.batter = i;
+  } else if (actions[act]) {
+    snap(); actions[act](i);
+  }
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
