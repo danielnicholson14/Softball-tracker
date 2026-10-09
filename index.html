@@ -12,8 +12,8 @@
 <link rel="manifest" href="manifest.webmanifest">
 <title>Softball Tracker</title>
 <style>
-:root{--bg:#f3f5f2;--card:#fff;--ink:#16211a;--muted:#6b766e;--line:#dde3dc;--accent:#1f7a3f;--out:#b42318;--hr:#b7791f;--run:#1d4ed8;--hl:#e8f4ec}
-@media (prefers-color-scheme:dark){:root{--bg:#0f1511;--card:#18211b;--ink:#e8efe9;--muted:#93a097;--line:#2a352d;--accent:#2f9e57;--out:#e5484d;--hr:#d9962c;--run:#4f7fe8;--hl:#1e3326}}
+:root{--bg:#f3f5f2;--card:#fff;--ink:#16211a;--muted:#6b766e;--line:#dde3dc;--accent:#1f7a3f;--out:#b42318;--hr:#b7791f;--run:#1d4ed8;--hl:#e8f4ec;--grass:#cfe8d3;--dirt:#c9a77c}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1511;--card:#18211b;--ink:#e8efe9;--muted:#93a097;--line:#2a352d;--accent:#2f9e57;--out:#e5484d;--hr:#d9962c;--run:#4f7fe8;--hl:#1e3326;--grass:#1f3a26;--dirt:#6b5235}}
 *{box-sizing:border-box}
 body{margin:0;font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);-webkit-tap-highlight-color:transparent}
 main{max-width:640px;margin:0 auto;padding:16px 16px 56px}
@@ -53,6 +53,19 @@ label{display:block;font-size:14px;color:var(--muted);margin:10px 0 4px}
 .outs i{width:14px;height:14px;border-radius:50%;border:2px solid var(--out)}
 .outs i.on{background:var(--out)}
 .batter{font-size:26px;font-weight:700;margin:2px 0}
+/* diamond */
+.field{position:relative;width:260px;height:215px;margin:6px auto 0}
+.diam{position:absolute;left:130px;top:100px;width:120px;height:120px;transform:translate(-50%,-50%) rotate(45deg);border:3px solid var(--dirt);background:var(--grass);border-radius:4px}
+.base{position:absolute;width:32px;height:32px;min-height:0;padding:0;transform:translate(-50%,-50%) rotate(45deg);border:2px solid var(--muted);background:var(--card);border-radius:5px}
+.base:active{transform:translate(-50%,-50%) rotate(45deg) scale(.92)}
+.base.on{background:var(--hr);border-color:var(--hr)}
+.base.sel{box-shadow:0 0 0 4px var(--run)}
+.plate{position:absolute;left:130px;top:186px;width:22px;height:22px;transform:translate(-50%,-50%);background:var(--muted);clip-path:polygon(0 0,100% 0,100% 55%,50% 100%,0 55%)}
+.rname{position:absolute;transform:translateX(-50%);font-size:12px;font-weight:700;white-space:nowrap;max-width:84px;overflow:hidden;text-overflow:ellipsis;background:var(--card);padding:1px 6px;border-radius:6px;border:1px solid var(--line);pointer-events:none}
+.grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:12px}
+.grid5 button{padding:10px 2px}
+.rbar{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:6px;margin-top:8px}
+.tag{font-size:12px;color:var(--hr);font-weight:700;margin-left:4px}
 /* line score */
 .ls-wrap{overflow-x:auto}
 table.ls{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:14px}
@@ -82,6 +95,9 @@ const KEY = 'softball-tracker-v1';
 const MAX_PLAYERS = 12;
 let S = load() || { screen: 'setup', teams: ['Away', 'Home'], our: 0, lineup: [], game: null };
 let history = [];
+let sel = null; // selected base index (0=1st,1=2nd,2=3rd) — not saved
+const BASE_NAMES = ['1st', '2nd', '3rd'];
+const EMPTY = () => [null, null, null];
 
 function load() { try { return JSON.parse(localStorage.getItem(KEY)); } catch (e) { return null; } }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
@@ -91,7 +107,7 @@ const range = n => Array.from({ length: n }, (_, i) => i);
 const total = t => S.game.runs[t].reduce((a, b) => a + (b || 0), 0);
 
 function newGame() {
-  S.game = { inning: 1, half: 0, outs: 0, batter: 0, runs: [[], []], oppHr: 0 };
+  S.game = { inning: 1, half: 0, outs: 0, batter: 0, runs: [[], []], oppHr: 0, bases: EMPTY() };
   S.lineup.forEach(p => Object.assign(p, { pa: 0, r: 0, hr: 0, o: 0 }));
 }
 
@@ -107,6 +123,37 @@ function addRun(team) {
   g.runs[team][i] = (g.runs[team][i] || 0) + 1;
 }
 function nextBatter() { S.game.batter = (S.game.batter + 1) % S.lineup.length; }
+// runner is a lineup index for our team, 'x' for the opponent
+function scoreRunner(r) {
+  addRun(S.game.half);
+  if (S.game.half === S.our && typeof r === 'number' && S.lineup[r]) S.lineup[r].r++;
+}
+// batter reaches base n (1-4); every runner moves up n bases, scoring past 3rd
+function advanceAll(n, batter) {
+  const b = S.game.bases, nb = EMPTY();
+  let scored = 0;
+  for (let i = 2; i >= 0; i--) {
+    if (b[i] === null) continue;
+    if (i + n >= 3) { scoreRunner(b[i]); scored++; } else nb[i + n] = b[i];
+  }
+  if (n >= 4) { scoreRunner(batter); scored++; } else nb[n - 1] = batter;
+  S.game.bases = nb;
+  return scored;
+}
+function hit(n) {
+  const g = S.game;
+  if (g.half === S.our) {
+    const idx = g.batter, p = S.lineup[idx];
+    p.pa++; if (n === 4) p.hr++;
+    const scored = advanceAll(n, idx);
+    nextBatter();
+    if (n === 4) toast(scored > 1 ? `💥 ${scored}-run HR — ${p.name}` : `💥 Solo HR — ${p.name}`);
+  } else {
+    if (n === 4) g.oppHr++;
+    const scored = advanceAll(n, 'x');
+    if (n === 4) toast(scored > 1 ? `💥 ${scored}-run HR` : '💥 Solo HR');
+  }
+}
 function addOut() {
   S.game.outs++;
   if (S.game.outs >= 3) endHalf(true);
@@ -115,7 +162,7 @@ function endHalf(auto) {
   const g = S.game;
   // make sure the finished half shows a 0 rather than blank
   const i = g.inning - 1; g.runs[g.half][i] = g.runs[g.half][i] || 0;
-  g.outs = 0;
+  g.outs = 0; g.bases = EMPTY(); sel = null;
   if (g.half === 0) g.half = 1; else { g.half = 0; g.inning++; }
   toast(`${auto ? '3 outs — ' : ''}${S.teams[g.half]} up, ${g.half ? 'bottom' : 'top'} ${g.inning}`);
 }
@@ -123,15 +170,21 @@ function endHalf(auto) {
 const actions = {
   // our batter
   bOut() { const p = S.lineup[S.game.batter]; p.pa++; p.o++; nextBatter(); addOut(); },
-  bSafe() { const p = S.lineup[S.game.batter]; p.pa++; nextBatter(); },
-  bHR() { const p = S.lineup[S.game.batter]; p.pa++; p.hr++; p.r++; addRun(S.our); nextBatter(); toast(`💥 HR — ${p.name}`); },
-  pRun(i) { S.lineup[i].r++; addRun(S.our); },
-  runnerOut() { addOut(); },
+  hit(n) { hit(n); },
   // opponent
   oOut() { addOut(); },
   oRun() { addRun(1 - S.our); },
-  oHR() { S.game.oppHr++; addRun(1 - S.our); },
   endHalf() { endHalf(false); },
+  // selected runner
+  rAdv() {
+    const b = S.game.bases, r = b[sel];
+    if (sel === 2) { b[2] = null; scoreRunner(r); sel = null; return; }
+    if (b[sel + 1] !== null) { toast(`${BASE_NAMES[sel + 1]} is occupied — move that runner first`); return; }
+    b[sel + 1] = r; b[sel] = null; sel++;
+  },
+  rScore() { const r = S.game.bases[sel]; S.game.bases[sel] = null; sel = null; scoreRunner(r); },
+  rOut() { S.game.bases[sel] = null; sel = null; addOut(); },
+  rRemove() { S.game.bases[sel] = null; sel = null; },
 };
 
 // ---------- views ----------
@@ -177,6 +230,35 @@ function gameView() {
     </div>
   </div>`;
 
+  // diamond: [x, y] of 1st, 2nd, 3rd
+  const pos = [[215, 100], [130, 15], [45, 100]];
+  const runnerLabel = r => r === null ? '' : (r === 'x' ? 'Runner' : (S.lineup[r] ? S.lineup[r].name : '?'));
+  const diamond = `
+    <div class="field">
+      <div class="diam"></div>
+      <div class="plate"></div>
+      ${pos.map(([x, y], i) => `
+        <button class="base ${g.bases[i] !== null ? 'on' : ''} ${sel === i ? 'sel' : ''}" style="left:${x}px;top:${y}px" data-act="tapBase" data-i="${i}" aria-label="${BASE_NAMES[i]} base${g.bases[i] !== null ? ': ' + esc(runnerLabel(g.bases[i])) : ''}"></button>
+        ${g.bases[i] !== null ? `<span class="rname" style="left:${x}px;top:${y + 22}px">${esc(runnerLabel(g.bases[i]))}</span>` : ''}`).join('')}
+    </div>
+    ${sel !== null ? `
+    <div class="muted" style="text-align:center">${esc(runnerLabel(g.bases[sel]))} on ${BASE_NAMES[sel]} — or tap an empty base to move them</div>
+    <div class="rbar">
+      ${sel < 2 ? `<button class="primary sm" data-act="rAdv">Advance</button>` : ''}
+      <button class="run sm" data-act="rScore">Score</button>
+      <button class="out sm" data-act="rOut">Out</button>
+      <button class="sm" data-act="rRemove">Remove</button>
+    </div>` : `<div class="muted" style="text-align:center">Tap a runner to advance, score, or put out</div>`}`;
+
+  const hitButtons = `
+      <div class="grid5">
+        <button class="out" data-act="${ours ? 'bOut' : 'oOut'}">Out</button>
+        <button class="primary" data-act="hit" data-i="1">1B</button>
+        <button class="primary" data-act="hit" data-i="2">2B</button>
+        <button class="primary" data-act="hit" data-i="3">3B</button>
+        <button class="hr" data-act="hit" data-i="4">HR</button>
+      </div>`;
+
   let panel;
   if (ours) {
     const b = S.lineup[g.batter], nx = S.lineup[(g.batter + 1) % n];
@@ -185,16 +267,12 @@ function gameView() {
       <div class="muted">Now batting · #${g.batter + 1}</div>
       <div class="batter">${esc(b.name)}</div>
       <div class="muted">On deck: ${esc(nx.name)}</div>
-      <div class="grid3">
-        <button class="out" data-act="bOut">Out</button>
-        <button class="primary" data-act="bSafe">On base</button>
-        <button class="hr" data-act="bHR">Home run</button>
-      </div>
-      <div class="grid2">
-        <button data-act="runnerOut">Runner out</button>
+      ${diamond}
+      ${hitButtons}
+      <div class="grid2" style="grid-template-columns:1fr">
         <button data-act="endHalf">End half-inning</button>
       </div>
-      <p class="muted" style="margin:10px 0 0">Tap <b>+Run</b> beside a player when they cross home. HR scores the batter automatically.</p>
+      <p class="muted" style="margin:10px 0 0">Hits move every runner up the same number of bases (1B = walk too). HR clears the bases. Fix anything by tapping a runner.</p>
     </div>`;
   } else {
     panel = `
@@ -202,12 +280,10 @@ function gameView() {
       <div class="muted">Batting</div>
       <div class="batter">${esc(S.teams[them])}</div>
       <div class="muted">HR this game: ${g.oppHr}</div>
-      <div class="grid3">
-        <button class="out" data-act="oOut">Out</button>
+      ${diamond}
+      ${hitButtons}
+      <div class="grid2">
         <button class="run" data-act="oRun">+Run</button>
-        <button class="hr" data-act="oHR">Home run</button>
-      </div>
-      <div class="grid2" style="grid-template-columns:1fr">
         <button data-act="endHalf">End half-inning</button>
       </div>
     </div>`;
@@ -228,13 +304,12 @@ function gameView() {
       ${S.lineup.map((p, i) => `
       <li class="${ours && i === g.batter ? 'up' : ''}">
         <span class="num">${i + 1}</span>
-        <button class="pn" data-act="setBatter" data-i="${i}" title="Set as current batter">${esc(p.name)}
+        <button class="pn" data-act="setBatter" data-i="${i}" title="Set as current batter">${esc(p.name)}${ours && g.bases.indexOf(i) >= 0 ? `<span class="tag">on ${BASE_NAMES[g.bases.indexOf(i)]}</span>` : ''}
           <small>R ${p.r} · HR ${p.hr} · Outs ${p.o} · PA ${p.pa}</small></button>
-        <button class="run sm" data-act="pRun" data-i="${i}" ${ours ? '' : 'disabled'}>+Run</button>
       </li>`).join('')}
     </ul>
     <div class="totals"><span>R ${sum('r')}</span><span>HR ${sum('hr')}</span><span>Outs ${sum('o')}</span></div>
-    <p class="muted" style="margin:8px 0 0">Tap a name to make them the current batter.</p>
+    <p class="muted" style="margin:8px 0 0">Tap a name to make them the current batter (e.g. to fix the order).</p>
   </div>`;
 
   return `
@@ -254,6 +329,7 @@ function gameView() {
 }
 
 function render() {
+  if (S.game && !S.game.bases) S.game.bases = EMPTY(); // games saved before base tracking
   document.getElementById('app').innerHTML = S.screen === 'setup' || !S.game ? setupView() : gameView();
   save();
 }
@@ -269,10 +345,17 @@ document.addEventListener('click', e => {
     if (!names.length) { alert('Add at least one player.'); return; }
     if (S.game) snap();
     const old = Object.fromEntries(S.lineup.map(p => [p.name, p]));
+    const onBase = S.game ? S.game.bases.map(r => typeof r === 'number' && S.lineup[r] ? S.lineup[r].name : r) : null;
     S.teams = [document.getElementById('t0').value.trim() || 'Away', document.getElementById('t1').value.trim() || 'Home'];
     S.our = +document.getElementById('our').value;
     S.lineup = names.map(n => old[n] || { name: n, pa: 0, r: 0, hr: 0, o: 0 });
-    if (!S.game) newGame(); else S.game.batter = Math.min(S.game.batter, S.lineup.length - 1);
+    if (!S.game) newGame();
+    else {
+      S.game.batter = Math.min(S.game.batter, S.lineup.length - 1);
+      // keep runners attached to the same players by name
+      S.game.bases = onBase.map(r => r === null || r === 'x' ? r : (names.indexOf(r) >= 0 ? names.indexOf(r) : null));
+    }
+    sel = null;
     S.screen = 'game';
   } else if (act === 'cancelSetup') {
     S.screen = 'game';
@@ -280,9 +363,14 @@ document.addEventListener('click', e => {
     S.screen = 'setup';
   } else if (act === 'newGame') {
     if (!confirm('Start a new game? Scores and stats reset; the lineup is kept.')) return;
-    snap(); newGame();
+    snap(); newGame(); sel = null;
   } else if (act === 'undo') {
     const prev = history.pop(); if (prev) S = JSON.parse(prev);
+    sel = null;
+  } else if (act === 'tapBase') {
+    const b = S.game.bases;
+    if (b[i] !== null) sel = sel === i ? null : i;          // select / deselect a runner
+    else if (sel !== null) { snap(); b[i] = b[sel]; b[sel] = null; sel = null; } // move to empty base
   } else if (act === 'setBatter') {
     snap(); S.game.batter = i;
   } else if (actions[act]) {
