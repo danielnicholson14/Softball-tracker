@@ -96,6 +96,7 @@ const MAX_PLAYERS = 12;
 let S = load() || { screen: 'setup', teams: ['Away', 'Home'], our: 0, lineup: [], game: null };
 let history = [];
 let sel = null; // selected base index (0=1st,1=2nd,2=3rd) — not saved
+let confirmNew = false; // showing the "start a new game?" prompt
 const BASE_NAMES = ['1st', '2nd', '3rd'];
 const EMPTY = () => [null, null, null];
 
@@ -321,6 +322,15 @@ function gameView() {
       <button class="sm" data-act="newGame">New game</button>
     </div>
   </header>
+  ${confirmNew ? `
+  <div class="card" style="margin-bottom:10px;border-color:var(--out)">
+    <b>Start a new game?</b>
+    <div class="muted">This game's score and stats are cleared. Teams and lineup are kept so you can tweak them.</div>
+    <div class="grid2">
+      <button data-act="newGameNo">Cancel</button>
+      <button class="out" data-act="newGameYes">New game</button>
+    </div>
+  </div>` : ''}
   ${board}
   <div style="height:10px"></div>
   ${panel}
@@ -339,10 +349,11 @@ document.addEventListener('click', e => {
   const btn = e.target.closest('[data-act]');
   if (!btn || btn.disabled) return;
   const act = btn.dataset.act, i = +btn.dataset.i;
+  if (act !== 'newGame') confirmNew = false;
 
   if (act === 'saveSetup') {
     const names = [...document.querySelectorAll('.pname')].map(x => x.value.trim()).filter(Boolean);
-    if (!names.length) { alert('Add at least one player.'); return; }
+    if (!names.length) { toast('Add at least one player'); return; }
     if (S.game) snap();
     const old = Object.fromEntries(S.lineup.map(p => [p.name, p]));
     const onBase = S.game ? S.game.bases.map(r => typeof r === 'number' && S.lineup[r] ? S.lineup[r].name : r) : null;
@@ -362,8 +373,14 @@ document.addEventListener('click', e => {
   } else if (act === 'editLineup') {
     S.screen = 'setup';
   } else if (act === 'newGame') {
-    if (!confirm('Start a new game? Scores and stats reset; the lineup is kept.')) return;
-    snap(); newGame(); sel = null;
+    confirmNew = !confirmNew;
+    if (confirmNew) window.scrollTo({ top: 0, behavior: 'smooth' });
+  } else if (act === 'newGameYes') {
+    // back to setup with teams + lineup prefilled; Start game resets all stats
+    S.game = null; S.screen = 'setup'; sel = null; history = [];
+    window.scrollTo(0, 0);
+  } else if (act === 'newGameNo') {
+    // prompt already cleared above
   } else if (act === 'undo') {
     const prev = history.pop(); if (prev) S = JSON.parse(prev);
     sel = null;
